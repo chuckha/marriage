@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -10,12 +11,40 @@ import (
 	"os"
 	"time"
 
+	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/chuckha/renthelper/slack"
 	"golang.org/x/net/publicsuffix"
 )
 
-const unavailable = "unavailable"
+const (
+	unavailable        = "unavailable"
+	slackChannelIDEnv  = "SLACK_CHANNEL_ID"
+	slackOauthTokenEnv = "SLACK_OAUTH_TOKEN"
+)
 
 func main() {
+	lambda.Start(handleRequest)
+}
+
+func handleRequest() (string, error) {
+	SlackChannelID := os.Getenv(slackChannelIDEnv)
+	SlackOauthToken := os.Getenv(slackOauthTokenEnv)
+
+	if SlackChannelID == "" || SlackOauthToken == "" {
+		return "", errors.New("must set SLACK_CHANNEL_ID and SLACK_OAUTH_TOKEN")
+	}
+	message, err := getMessage()
+	if err != nil {
+		return "", err
+	}
+	sc := slack.NewClient(SlackOauthToken)
+	if err := sc.Post(SlackChannelID, message); err != nil {
+		return "", errors.New("failed to post to slack")
+	}
+	return "", nil
+}
+
+func getMessage() (string, error) {
 	start := time.Now().Add(2 * 24 * time.Hour).Format("2006-01-02")
 	end := time.Now().Add(150 * 24 * time.Hour).Format("2006-01-02")
 	fmt.Printf("Checking from %s to %s\n", start, end)
@@ -23,14 +52,14 @@ func main() {
 
 	j, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
 	if err != nil {
-		panic(j)
+		return "", err
 	}
 	client := http.Client{
 		Jar: j,
 	}
 	u, err := url.Parse(fmt.Sprintf(urlFormat, start, end))
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 	fmt.Println(u.String())
 	headers := http.Header{}
@@ -48,28 +77,28 @@ func main() {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 	fmt.Println(resp)
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 	responseData := &response{}
 	fmt.Fprintln(os.Stderr, string(data))
 	if err := json.Unmarshal(data, responseData); err != nil {
-		panic(err)
+		return "", err
 	}
-	found := false
+	message := ""
 	for _, day := range responseData.Days {
 		if day.Status != unavailable {
-			found = true
-			fmt.Printf("%s has availability! %v\n", day.Date, day.Spots)
+			message += fmt.Sprintf("%s has availability! %v\n", day.Date, day.Spots)
 		}
 	}
-	if !found {
-		fmt.Println("Nothing available")
+	if message == "" {
+		return "Nothing available", nil
 	}
+	return message, nil
 }
 
 type response struct {
