@@ -1,0 +1,77 @@
+Parameters:
+    S3Bucket:
+        Type: String
+        Default: cupidsarrow
+        Description: The s3 bucket where the lamda function exists.
+    S3Key:
+        Type: String
+        Default: deployment.zip
+        Description: The name of the uploaded lambda function (must be go).
+    SlackChannelID:
+        Type: String
+        Description: The Slack channel ID, https://app.slack.com/client/<workspace_id>/<channel_id>
+    SlackOauthToken:
+        Type: String
+        Description: The Slack Oauth token to allow posting to slack, from https://api.slack.com/apps/<some identifier>/oauth?
+    Frequency:
+        Type: String
+        Default: rate(1 hour)
+        Description: How frequently to check for updates. Please be kind and do not use small values.
+Resources:
+    InvokeCupidsArrowPermission:
+        Type: AWS::Lambda::Permission
+        Properties:
+            Action: lambda:InvokeFunction
+            FunctionName:
+                Fn::GetAtt:
+                - CupidsArrow
+                - Arn
+            Principal: events.amazonaws.com
+            SourceArn:
+                Fn::GetAtt:
+                - CupidsArrowRule
+                - Arn
+    CupidsArrowRule:
+        Type: AWS::Events::Rule
+        Properties:
+            Description: Hourly trigger.
+            ScheduleExpression: !Ref Frequency
+            State: ENABLED
+            Targets:
+            - Arn:
+                Fn::GetAtt:
+                - CupidsArrow
+                - Arn
+              Id: CupidsArrow
+    CupidsArrowRole:
+        Type: AWS::IAM::Role
+        Properties:
+            Description: Role for CupidsArrow lambda function.
+            AssumeRolePolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                - Effect: Allow
+                  Principal:
+                      Service:
+                      - lambda.amazonaws.com
+                  Action:
+                  - sts:AssumeRole
+            ManagedPolicyArns:
+            - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+    CupidsArrow:
+        Type: AWS::Lambda::Function
+        Properties:
+            Environment:
+                Variables:
+                    SLACK_CHANNEL_ID: !Ref SlackChannelID
+                    SLACK_OAUTH_TOKEN: !Ref SlackOauthToken
+            Code:
+                S3Bucket: !Ref S3Bucket
+                S3Key: !Ref S3Key
+            Handler: main
+            Role:
+                Fn::GetAtt:
+                - CupidsArrowRole
+                - Arn
+            Runtime: go1.x
+            Timeout: 30

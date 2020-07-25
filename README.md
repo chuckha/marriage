@@ -1,10 +1,30 @@
 # marriage
 
-This is designed to be run with [AWS Lambda](https://aws.amazon.com/lambda/).
+# Lambda function set up
 
-To get started, build the bundle with `make`. The default target builds a zip bundle that will work with lambda.
+## For the trusting
 
-You will need a slack oauth token and a slack channel to post to.
+This project is built and uploaded to s3 as a lambda zip.
+
+1. Figure out your slack channel ID.
+2. Figure out your slack oauth token.
+3. Upload the cloudformation.yaml file to
+   https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks?filteringText=&filteringStatus=active&viewNested=true&hideStacks=false
+4. Supply the non-default fields.
+5. Click through the forms.
+6. Wait and watch slack!
+
+## For the untrusting
+
+1. Gain trust in this code.
+2. Build it and upload to s3.
+3. Follow the steps above for the trusting, except replace the default values in
+   the cloud formation template with your custom values.
+
+## Build
+
+This uses a Makefile to help build. Run `make build` to build the resources and
+`make clean` to clean everything up.
 
 ## Slack set up
 
@@ -19,45 +39,3 @@ You will need a slack oauth token and a slack channel to post to.
 
 0. Grab the `Bot User Oauth Token` for later
 0. Find the channel ID by going to your workspace and joining the channel and looking at the URL: `https://app.slack.com/client/<workspace_id>/<channel_id>`
-
-## Lambda set up
-
-1. Log in to the aws console
-0. Go to the [lambda service page](https://console.aws.amazon.com/lambda/home?region=us-east-1#/create/function)
-
-    1. Fill in some name like `project-cupid` or whatever you want, this doesn't matter
-    0. Select `Go 1.x` as the runtime
-    0. No permissions are necessary
-    0. Create function
-
-0. In the configuration page
-
-    1. Under `Designer`
-    
-        0. Click `Add trigger`
-        0. Select `CloudWatch Events/EventBridge`
-        0. For the rule, you want to pick `Create a new rule`
-    
-            1. Rule name isn't relevant, something like "project-cupid-schedule' will work
-            0. Select `Schedule expression`
-            0. Fill in an expression like `rate(2 hours)` which means once every two hours
-            0. Make sure enable trigger is selected
-            0. click `Add`
-
-    0. Under `Function code` change the `Handler` to `main`
-        
-        1. Upload the zip file built at the very beginning
-
-    0. Under `Environmnet Variables`
-    
-        1. set `SLACK_CHANNEL_ID` to the channel ID of the slack channel you want this function to post to
-        0. set `SLACK_OAUTH_TOKEN` to the oauth token provided by slack
-        
-    0. Save your configuration
-    0. At the top, next to `Test`, click the dropdown labled `Select a test event`
-    0. Select `Configure test event`
-    0. Name it anything you like, I called mine `whatever`
-    0. Push `Create`
-    0. Push `Test`
-    0. If you don't see anything in your slack channel then there is an error with the configuraiton, check the cloudwatch logs
-    

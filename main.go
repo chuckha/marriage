@@ -92,7 +92,10 @@ func getMessage() (string, error) {
 	message := ""
 	for _, day := range responseData.Days {
 		if day.Status != unavailable {
-			message += fmt.Sprintf("%s has availability! %v\n", day.Date, day.Spots)
+			message += fmt.Sprintf("*%s has availability!*\n", day.Date)
+			for _, spot := range day.Spots {
+				message += fmt.Sprintf("%v\n", spot)
+			}
 		}
 	}
 	if message == "" {
